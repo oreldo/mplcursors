@@ -22,6 +22,7 @@ _default_bindings = dict(
     right="shift+right",
     up="shift+up",
     down="shift+down",
+    delete_cursor="delete",
     toggle_enabled="e",
     toggle_visible="v",
 )
@@ -629,6 +630,8 @@ class Cursor:
         if not self._selections or not self.enabled:
             return
         sel = self._selection_stack[-1]
+        if event.key == self.bindings["delete_cursor"]:
+            self.remove_selection(sel)
         for key in ["left", "right", "up", "down"]:
             if event.key == self.bindings[key]:
                 self.remove_selection(sel)
