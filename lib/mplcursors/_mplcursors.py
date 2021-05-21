@@ -234,6 +234,7 @@ class Cursor:
         self._last_auto_position = None
         self._callbacks = {"add": [], "remove": []}
         self._hover = hover
+        self.active = False
 
         self._suppressed_events = WeakSet()
         connect_pairs = [
@@ -630,13 +631,14 @@ class Cursor:
         if not self._selections or not self.enabled:
             return
         sel = self._selection_stack[-1]
-        if event.key == self.bindings["delete_cursor"]:
-            self.remove_selection(sel)
-        for key in ["left", "right", "up", "down"]:
-            if event.key == self.bindings[key]:
+        if self.active:
+            if event.key == self.bindings["delete_cursor"]:
                 self.remove_selection(sel)
-                self.add_selection(_pick_info.move(*sel, key=key))
-                break
+            for key in ["left", "right", "up", "down"]:
+                if event.key == self.bindings[key]:
+                    self.remove_selection(sel)
+                    self.add_selection(_pick_info.move(*sel, key=key))
+                    break
 
     def remove_selection(self, sel):
         """Remove a `Selection`."""
