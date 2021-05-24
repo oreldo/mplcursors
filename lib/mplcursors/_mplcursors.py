@@ -17,12 +17,13 @@ from . import _pick_info
 
 _default_bindings = dict(
     select=1,
+    select2=2,
     deselect=3,
     left="shift+left",
     right="shift+right",
     up="shift+up",
     down="shift+down",
-    delete_cursor="delete",
+    delete="delete",
     toggle_enabled="e",
     toggle_visible="v",
 )
@@ -180,6 +181,9 @@ class Cursor:
             ================ ==================================================
             'select'         mouse button to select an artist
                              (default: 1)
+            'select2'        mouse button to select an artist
+                             using a different callback
+                             (default: 2)
             'deselect'       mouse button to deselect an artist
                              (default: 3)
             'left'           move to the previous point in the selected path,
@@ -192,6 +196,8 @@ class Cursor:
                              (default: shift+up)
             'down'           move down in the selected image
                              (default: shift+down)
+            'delete'         delete active selection
+                             (default: delete)
             'toggle_enabled' toggle whether the cursor is active
                              (default: e)
             'toggle_visible' toggle default cursor visibility and apply it to
@@ -232,9 +238,9 @@ class Cursor:
         self._selections = []
         self._selection_stack = []
         self._last_auto_position = None
-        self._callbacks = {"add": [], "remove": []}
+        self._callbacks = {"add": [], "add2": [], "remove": []}
         self._hover = hover
-        self.active = False
+        self.active = True
 
         self._suppressed_events = WeakSet()
         connect_pairs = [
@@ -358,7 +364,7 @@ class Cursor:
         with the added annotation set in the :attr:`annotation` field and, if
         applicable, the highlighting artist in the :attr:`extras` field.
 
-        Emits the ``"add"`` event with the new `Selection` as argument.  When
+        Emits the ``"add"`` (or ``"add2"``) event with the new `Selection` as argument.  When
         the event is emitted, the position of the annotation is temporarily
         set to ``(nan, nan)``; if this position is not explicitly set by a
         callback, then a suitable position will be automatically computed.
@@ -390,8 +396,12 @@ class Cursor:
         sel = pi._replace(annotation=ann, extras=extras)
         self._selections.append(sel)
         self._selection_stack.append(sel)
-        for cb in self._callbacks["add"]:
-            cb(sel)
+        if sel.button == self.bindings["select"]:
+            for cb in self._callbacks["add"]:
+                cb(sel)
+        elif sel.button == self.bindings["select2"]:
+            for cb in self._callbacks["add2"]:
+                cb(sel)
 
         # Check that `ann.axes` is still set, as callbacks may have removed the
         # annotation.
@@ -468,7 +478,7 @@ class Cursor:
 
         Two events can be connected to:
 
-        - callbacks connected to the ``"add"`` event are called when a
+        - callbacks connected to the ``"add"`` (or ``"add2"``) event are called when a
           `Selection` is added, with that selection as only argument;
         - callbacks connected to the ``"remove"`` event are called when a
           `Selection` is removed, with that selection as only argument.
@@ -553,6 +563,8 @@ class Cursor:
     def _on_nonhover_button_press(self, event):
         if _mouse_event_matches(event, self.bindings["select"]):
             self._on_select_event(event)
+        if _mouse_event_matches(event, self.bindings["select2"]):
+            self._on_select_event(event)
         if _mouse_event_matches(event, self.bindings["deselect"]):
             self._on_deselect_event(event)
 
@@ -631,8 +643,9 @@ class Cursor:
         if not self._selections or not self.enabled:
             return
         sel = self._selection_stack[-1]
+        # bindings below work only if selection is active
         if self.active:
-            if event.key == self.bindings["delete_cursor"]:
+            if event.key == self.bindings["delete"]:
                 self.remove_selection(sel)
             for key in ["left", "right", "up", "down"]:
                 if event.key == self.bindings[key]:
