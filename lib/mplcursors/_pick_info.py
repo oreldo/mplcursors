@@ -111,7 +111,7 @@ def _with_attrs(array, **kwargs):
     return array
 
 
-Selection = namedtuple("Selection", "artist target dist annotation extras button")
+Selection = namedtuple("Selection", "artist target dist annotation extras event")
 # Override equality to identity: Selections should be considered immutable
 # (with mutable fields though) and we don't want to trigger casts of array
 # equality checks to booleans.  We don't need to override comparisons because
@@ -129,8 +129,8 @@ Selection.annotation.__doc__ = (
 Selection.extras.__doc__ = (
     "An additional list of artists (e.g., highlighters) that will be cleared "
     "at the same time as the annotation.")
-Selection.button.__doc__ = (
-    "The button pressed to add selection.")
+Selection.event.__doc__ = (
+    "The event used to add selection.")
 
 @functools.singledispatch
 def compute_pick(artist, event):
@@ -202,7 +202,7 @@ class Index:
         return cls(i, x, y)
 
 
-def _compute_projection_pick(artist, path, xy, button):
+def _compute_projection_pick(artist, path, xy, event):
     """
     Project *xy* on *path* to obtain a `Selection` for *artist*.
 
@@ -253,7 +253,7 @@ def _compute_projection_pick(artist, path, xy, button):
         target.index = (
             (argmin + dot[argmin] / ls[argmin])
             / (path._interpolation_steps / tpath._interpolation_steps))
-        return Selection(artist, target, dmin, None, None, button)
+        return Selection(artist, target, dmin, None, None, event)
 
 
 def _untransform(orig_xy, screen_xy, ax):
@@ -298,11 +298,11 @@ def _(artist, event):
                 _untransform(  # More precise than transforming back.
                     data_xy[argmin], data_screen_xy[argmin], artist.axes),
                 index=argmin)
-            sels.append(Selection(artist, target, ds[argmin], None, None, event.button.value))
+            sels.append(Selection(artist, target, ds[argmin], None, None, event))
     # If lines are visible, find the closest projection.
     if (artist.get_linestyle() not in ["None", "none", " ", "", None]
             and len(artist.get_xydata()) > 1):
-        sel = _compute_projection_pick(artist, artist.get_path(), xy, event.button.value)
+        sel = _compute_projection_pick(artist, artist.get_path(), xy, event)
         if sel is not None:
             sel.target.index = {
                 "_draw_lines": lambda _, index: index,
@@ -321,7 +321,7 @@ def _(artist, event):
 @compute_pick.register(Rectangle)
 def _(artist, event):
     sel = _compute_projection_pick(
-        artist, artist.get_path(), (event.x, event.y), event.button.value)
+        artist, artist.get_path(), (event.x, event.y), event)
     if sel and sel.dist < PATCH_PICKRADIUS:
         return sel
 
@@ -347,7 +347,7 @@ def _(artist, event):
         target = _with_attrs(
             _untransform(offsets[argmin], offsets_screen[argmin], artist.axes),
             index=inds[argmin])
-        return Selection(artist, target, ds[argmin], None, None, event.button.value)
+        return Selection(artist, target, ds[argmin], None, None, event)
     elif len(paths) and len(offsets):
         # Note that this won't select implicitly closed paths.
         sels = [*filter(None, [
@@ -388,7 +388,7 @@ def _(artist, event):
     low, high = np.array([[xmin, ymin], [xmax, ymax]])
     idxs = ((xy - low) / (high - low) * ns).astype(int)[::-1]
     target = _with_attrs(xy, index=tuple(idxs))
-    return Selection(artist, target, 0, None, None, event.button.value)
+    return Selection(artist, target, 0, None, None, event)
 
 
 @compute_pick.register(Barbs)
@@ -402,7 +402,7 @@ def _(artist, event):
         target = _with_attrs(
             _untransform(offsets[argmin], offsets_screen[argmin], artist.axes),
             index=argmin)
-        return Selection(artist, target, ds[argmin], None, None, event.button.value)
+        return Selection(artist, target, ds[argmin], None, None, event)
     else:
         return None
 
@@ -434,7 +434,7 @@ def _(container, event):
         target[1], = (
             y for y in [patch.get_y(), patch.get_y() + patch.get_height()]
             if y not in patch.sticky_edges.y)
-    return Selection(container, target, 0, None, None, event.button.value)
+    return Selection(container, target, 0, None, None, event)
 
 
 @compute_pick.register(ErrorbarContainer)
@@ -452,7 +452,7 @@ def _(container, event):
             target = _with_attrs(data_line.get_xydata()[idx], index=idx)
         else:  # We can't guess the original data in that case!
             return
-        return Selection(container, target, 0, None, None, event.button.value)
+        return Selection(container, target, 0, None, None, event)
     else:
         return
 
@@ -472,7 +472,7 @@ def _(container, event):
         target = _with_attrs(
             container.stemlines.get_segments()[idx][-1],
             index=sel.target.index)
-        return Selection(container, target, 0, None, None, event.button.value)
+        return Selection(container, target, 0, None, None, event)
 
 
 def _call_with_selection(func):

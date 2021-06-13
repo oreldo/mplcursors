@@ -396,10 +396,10 @@ class Cursor:
         sel = pi._replace(annotation=ann, extras=extras)
         self._selections.append(sel)
         self._selection_stack.append(sel)
-        if sel.button == self.bindings["select"]:
+        if sel.event.button.value == self.bindings["select"]:
             for cb in self._callbacks["add"]:
                 cb(sel)
-        elif sel.button == self.bindings["select2"]:
+        elif sel.event.button.value == self.bindings["select2"]:
             for cb in self._callbacks["add2"]:
                 cb(sel)
 
